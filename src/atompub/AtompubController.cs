@@ -1,33 +1,70 @@
 ﻿using System;
 using System.Linq;
+using System.Xml;
 using Microsoft.AspNet.Mvc;
-using Terradue.ServiceModel.Syndication;
 using sb5.atompub.ViewModels;
+using Terradue.ServiceModel.Syndication;
 
 // from http://www.asp.net/vnext/overview/aspnet-vnext/create-a-web-api-with-mvc-6
 namespace sb5.atompub.Controllers {
-  [Route("api/[controller]")]
+  [Route("api/[controller]/[action]")]
   public class AtompubController : Controller {
     // GET: /api/atompub/details
-    // TODO: drop this; this is just to enable Url.Action and Url.Link
+    // TODO: drop this; this is just to enable Url.Action
     [HttpGet("{id}")]
     public IActionResult Details(string id) {
       return null; // TODO
     }
 
     // GET: /api/atompub/atomdetails
-    // TODO: drop this; this is just to enable Url.Action and Url.Link
+    // TODO: drop this; this is just to enable Url.Action
     [HttpGet("{id}")]
     public IActionResult AtomDetails(string id) {
       return null; // TODO
     }
 
-    // GET: /api/atompub
+    // GET: /api/atompub/
     [HttpGet]
     public IActionResult Index() {
-      return new AtomActionResult(GetAtomFeed(new AtompubViewModel()));
+      return new ServiceDocumentActionResult(GetServiceDocument(new AtompubViewModel(Request)));
     }
 
+    ServiceDocument GetServiceDocument(AtompubViewModel vm) {
+      var workspaces = new Workspace[] {
+        new Workspace("Default", new ResourceCollectionInfo[] {
+          new ResourceCollectionInfo("Posts",                              new Uri(Url.Action("posts"), UriKind.Relative)) { Categories = { new InlineCategoriesDocument() { IsFixed = false, Scheme = vm.CategoryScheme } } },
+          new ResourceCollectionInfo(new TextSyndicationContent("Images"), new Uri(Url.Action("images"), UriKind.Relative), null, new string[] { "image/*" } ),
+        }),
+      };
+      var doc = new ServiceDocument(workspaces);
+
+      var categories = ((InlineCategoriesDocument)doc.Workspaces[0].Collections[0].Categories[0]).Categories;
+      foreach (var cat in vm.PostCategories) {
+        categories.Add(new SyndicationCategory(cat.Name, null, cat.DisplayName));
+      }
+
+      return doc;
+    }
+
+    // GET: /api/atompub/posts
+    [HttpGet]
+    public IActionResult Posts(string category = null, int page = 0) {
+      return new AtomActionResult(GetAtomFeed(new AtompubViewModel(Request, category, page)));
+    }
+
+    // POST: /api/atompub/posts
+    [HttpPost]
+    public IActionResult Posts([FromBody] XmlElement body) {
+      return CreateAtomPost(body);
+    }
+
+    // GET: /api/atompub/images
+    [HttpGet("{id}")]
+    public IActionResult Images(string id) {
+      return null; // TODO
+    }
+
+    #region GET posts
     SyndicationFeed GetAtomFeed(AtompubViewModel vm) {
       var posts = vm.Posts.ToArray();
       var feed = new SyndicationFeed() {
@@ -79,6 +116,51 @@ namespace sb5.atompub.Controllers {
 
       return entry;
     }
+    #endregion // GET posts
+
+    #region POST posts
+    IActionResult CreateAtomPost(XmlElement body) {
+      // TODO
+      //if (!BasicAuthSingleAdminUserModule.ForceSslAndBasicAuthAsAdmin()) { return null; }
+
+#if false
+      // Get post data
+      SyndicationItem entry = null;
+      using (var reader = XmlReader.Create(Request.InputStream)) {
+        entry = SyndicationItem.Load(reader);
+      }
+
+      // Create post
+      var post = new Post() {
+        Categories = entry.Categories.Aggregate("", (cats, cat) => cats.Length == 0 ? cat.Name : cats + "," + cat.Name),
+        Content = ((TextSyndicationContent)entry.Content).Text,
+        CreationDate = entry.PublishDate < minDate ? DateTime.Now : entry.PublishDate.DateTime,
+        Author = entry.Authors.Count > 0 ? entry.Authors[0].Name : null,
+        Email = entry.Authors.Count > 0 ? entry.Authors[0].Email : null,
+        IsActive = true,
+        Title = entry.Title.Text,
+        UuidString = Guid.NewGuid().ToString(),
+      };
+
+      db.Add(post);
+      db.SaveChanges();
+
+      // Return the updated post
+      var postLink = GetAtomPostLink(post.Id);
+      entry.Id = postLink;
+      entry.Authors.Add(new SyndicationPerson() { Name = db.Site.ContactName, Email = db.Site.ContactEmail });
+
+      var sb = new StringBuilder();
+      // OMG! WLW crashes if it gets back an XML declaration!
+      using (var writer = XmlWriter.Create(sb, new XmlWriterSettings() { OmitXmlDeclaration = true })) { entry.SaveAsAtom10(writer); }
+      var result = new SimpleActionResult() { ResponseOut = sb.ToString(), StatusCode = 201, StatusDescription = "Created" };
+      result.Headers.Add("Location", postLink);
+      return result;
+#endif
+      return null;
+    }
+
+#endregion // POST
 
     // Helpers
     string GetIdLink(string action, string id) {

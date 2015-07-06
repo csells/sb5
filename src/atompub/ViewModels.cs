@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.AspNet.Http;
 
 namespace sb5.atompub.ViewModels {
   class AtompubViewModel {
@@ -15,12 +16,22 @@ namespace sb5.atompub.ViewModels {
     public IEnumerable<PostCategory> PostCategories { get; internal set; }
     public IEnumerable<Post> Posts { get; internal set; }
 
-    // TODO
-    public AtompubViewModel() {
-      PostCategories = new PostCategory[0];
+    public AtompubViewModel(HttpRequest request, string category = null, int page = 0) {
+      // TODO: this is from the site description
+      About = "About";
+      CategoryScheme = "http://sellsbrothers.com/todo/categoryscheme";
+      ContactEmail = "todo@email.com";
+      ContactName = "TodO Mally";
+      ContactUrl = "http://example.com/TODO";
+      CopyrightNotice = "Copyright (c) now-forever TODO Corp.";
+      FeedId = "feedid";
+      FeedTitle = "feedtitle";
+      ImageUrl = new Uri(request.Scheme + "://" + request.Host + "/sellsbrothers_feed_logo.jpg");
+      PostCategories = new PostCategory[] { new PostCategory { Name = "postcat-name-1", DisplayName = "postcat-display-1" }, new PostCategory { Name = "postcat-name-2", DisplayName = "postcat-display-2" }, };
       Posts = new Post[] {
         new Post { Author = "Chris Sells", Content = "<h1>testing</h1><p>123...</p>", CreationDate = new DateTime(1995, 1, 1, 12, 0, 0), Id = "1", Title = "Test 1" },
         new Post { Author = "Chris Sells", Content = "<h1>testing</h1><p>321...</p>", CreationDate = new DateTime(1995, 1, 1, 12, 0, 1), Id = "2", Title = "Test 2" },
+        new Post { Author = "Chris Sells", Content = "<h1>testing</h1><p>abc...</p>", CreationDate = new DateTime(1995, 1, 1, 12, 0, 2), Id = "3", Title = "Test 3" },
       };
     }
 
